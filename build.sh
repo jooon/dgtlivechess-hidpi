@@ -140,11 +140,19 @@ mkdir -p "$TMP_DIR/classes"
   --release 11 \
   --module-path "$OPENJFX_DIR" \
   --add-modules javafx.controls,javafx.fxml,javafx.swing,javafx.base,javafx.graphics,javafx.media,javafx.web \
+  --add-exports javafx.controls/com.sun.javafx.scene.control.behavior=ALL-UNNAMED \
+  --add-exports javafx.controls/com.sun.javafx.scene.control.inputmap=ALL-UNNAMED \
   -cp "$APPLICATION_JAR" \
   -d "$TMP_DIR/classes" \
+  "$ROOT_DIR/compat-src/com/sun/javafx/scene/control/skin/BehaviorSkinBase.java" \
+  "$ROOT_DIR/compat-src/com/sun/javafx/scene/control/skin/CellSkinBase.java" \
+  "$ROOT_DIR/compat-src/com/novotea/chess/javafx/ui/ItemViewBehaviour.java" \
+  "$ROOT_DIR/compat-src/com/novotea/chess/javafx/ui/ItemCellBehaviour.java" \
   "$ROOT_DIR/compat-src/com/novotea/entity/ProxyUtil.java" \
   "$ROOT_DIR/compat-src/com/novotea/entity/ProxyEntityAccess.java" \
-  "$ROOT_DIR/compat-src/com/novotea/ui/core/AbstractColumnUI.java"
+  "$ROOT_DIR/compat-src/com/novotea/ui/core/AbstractColumnUI.java" \
+  "$ROOT_DIR/compat-src/com/novotea/livechess/operations/tournament/StartRecording.java" \
+  "$ROOT_DIR/compat-src/com/novotea/livechess/service/eboard/DefaultEBoardService.java"
 
 rm -rf "$CLASSES_DIR"
 mv "$TMP_DIR/classes" "$CLASSES_DIR"

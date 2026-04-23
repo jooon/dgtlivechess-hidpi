@@ -15,7 +15,7 @@ JAVAFX_PLATFORM=${JAVAFX_PLATFORM:-linux}
 JAVA_USER_HOME=${JAVA_USER_HOME:-$HOME}
 
 PACKAGE_JAR="$APP_DIR/app/package.jar"
-PATCHED_PACKAGE_JAR="$CACHE_DIR/package-patched.jar"
+PATCHED_PACKAGE_JAR="$CACHE_DIR/package-patched-v3.jar"
 BOOT_CONFIG="$STATE_DIR/boot/config.json"
 OPENJFX_DIR="$BUILD_DIR/openjfx-runtime"
 JAXB_DIR="$BUILD_DIR/jaxb-runtime"
@@ -51,10 +51,16 @@ required_files=(
   "$JAXB_DIR/txw2-2.3.9.jar"
   "$JAXB_DIR/istack-commons-runtime-3.0.12.jar"
   "$JAXB_DIR/javax.activation-api-1.2.0.jar"
+  "$CLASSES_DIR/com/sun/javafx/scene/control/skin/BehaviorSkinBase.class"
+  "$CLASSES_DIR/com/sun/javafx/scene/control/skin/CellSkinBase.class"
+  "$CLASSES_DIR/com/novotea/chess/javafx/ui/ItemViewBehaviour.class"
+  "$CLASSES_DIR/com/novotea/chess/javafx/ui/ItemCellBehaviour.class"
   "$CLASSES_DIR/com/novotea/entity/ProxyUtil.class"
   "$CLASSES_DIR/com/novotea/entity/ProxyUtil\$InvokeCallback.class"
   "$CLASSES_DIR/com/novotea/entity/ProxyEntityAccess.class"
   "$CLASSES_DIR/com/novotea/ui/core/AbstractColumnUI.class"
+  "$CLASSES_DIR/com/novotea/livechess/operations/tournament/StartRecording.class"
+  "$CLASSES_DIR/com/novotea/livechess/service/eboard/DefaultEBoardService.class"
 )
 
 missing=0
@@ -96,6 +102,18 @@ STATE_DIR = pathlib.Path(sys.argv[4])
 CLASSES_DIR = pathlib.Path(sys.argv[5])
 
 PATCHES = {
+    "com/sun/javafx/scene/control/skin/BehaviorSkinBase.class": (
+        CLASSES_DIR / "com/sun/javafx/scene/control/skin/BehaviorSkinBase.class"
+    ).read_bytes(),
+    "com/sun/javafx/scene/control/skin/CellSkinBase.class": (
+        CLASSES_DIR / "com/sun/javafx/scene/control/skin/CellSkinBase.class"
+    ).read_bytes(),
+    "com/novotea/chess/javafx/ui/ItemViewBehaviour.class": (
+        CLASSES_DIR / "com/novotea/chess/javafx/ui/ItemViewBehaviour.class"
+    ).read_bytes(),
+    "com/novotea/chess/javafx/ui/ItemCellBehaviour.class": (
+        CLASSES_DIR / "com/novotea/chess/javafx/ui/ItemCellBehaviour.class"
+    ).read_bytes(),
     "com/novotea/entity/ProxyUtil.class": (CLASSES_DIR / "com/novotea/entity/ProxyUtil.class").read_bytes(),
     "com/novotea/entity/ProxyUtil$InvokeCallback.class": (
         CLASSES_DIR / "com/novotea/entity/ProxyUtil$InvokeCallback.class"
@@ -105,6 +123,12 @@ PATCHES = {
     ).read_bytes(),
     "com/novotea/ui/core/AbstractColumnUI.class": (
         CLASSES_DIR / "com/novotea/ui/core/AbstractColumnUI.class"
+    ).read_bytes(),
+    "com/novotea/livechess/operations/tournament/StartRecording.class": (
+        CLASSES_DIR / "com/novotea/livechess/operations/tournament/StartRecording.class"
+    ).read_bytes(),
+    "com/novotea/livechess/service/eboard/DefaultEBoardService.class": (
+        CLASSES_DIR / "com/novotea/livechess/service/eboard/DefaultEBoardService.class"
     ).read_bytes(),
 }
 
@@ -190,7 +214,7 @@ def build_patched_package(package_jar, patched_package_jar):
                 tmp_path.unlink()
 
 
-def patch_boot_jars(state_dir, boot_config):
+def patch_boot_jars(package_jar, state_dir, boot_config):
     boot_dir = state_dir / "boot"
     if not boot_dir.exists():
         return
@@ -213,12 +237,44 @@ def patch_boot_jars(state_dir, boot_config):
             continue
         targets.add(jar_path)
 
+    with zipfile.ZipFile(package_jar, "r") as zf:
+        original_application = zf.read("application.jar")
+
+    patched_application = patch_zip_bytes(original_application)
+
     for jar_path in sorted(targets):
-        patch_zip_file(jar_path, ".orig")
+        write_atomic(jar_path, patched_application)
+
+
+def cleanup_virtual_board_recordings(state_dir):
+    recording_dir = state_dir / "recording"
+    if not recording_dir.exists():
+        return
+
+    for path in recording_dir.glob("*.json"):
+        try:
+            data = json.loads(path.read_text())
+        except Exception:
+            continue
+
+        serial_nr = None
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            for value in item.values():
+                if isinstance(value, dict) and value.get("serialNr") == "Virtual board":
+                    serial_nr = value.get("serialNr")
+                    break
+            if serial_nr:
+                break
+
+        if serial_nr == "Virtual board":
+            path.unlink()
 
 
 build_patched_package(PACKAGE_JAR, PATCHED_PACKAGE_JAR)
-patch_boot_jars(STATE_DIR, BOOT_CONFIG)
+patch_boot_jars(PACKAGE_JAR, STATE_DIR, BOOT_CONFIG)
+cleanup_virtual_board_recordings(STATE_DIR)
 PY
 
 cd "$APP_DIR"
@@ -226,6 +282,8 @@ cd "$APP_DIR"
 exec "$JAVA" \
   --module-path "$OPENJFX_DIR" \
   --add-modules javafx.controls,javafx.fxml,javafx.swing,javafx.base,javafx.graphics,javafx.media,javafx.web \
+  --add-exports javafx.controls/com.sun.javafx.scene.control.behavior=ALL-UNNAMED \
+  --add-exports javafx.controls/com.sun.javafx.scene.control.inputmap=ALL-UNNAMED \
   -cp "$PATCHED_PACKAGE_JAR:$JAXB_CP" \
   -Dcom.novotea.livechess.loader.directory=user \
   -Dglass.gtk.uiScale="$UI_SCALE" \
