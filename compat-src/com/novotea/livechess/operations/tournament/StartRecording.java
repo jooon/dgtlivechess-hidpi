@@ -22,7 +22,7 @@ import java.util.List;
 
 @APIOperation.Description("Record new games")
 public class StartRecording extends APIOperation {
-  private static final String VIRTUAL_SERIAL = "Virtual board";
+  private static final String VIRTUAL_SERIAL_PREFIX = "Virtual board ";
   private static final byte BEGIN_OPCODE = (byte) 111;
 
   private final List<Pairing> pairings;
@@ -55,7 +55,7 @@ public class StartRecording extends APIOperation {
     }
 
     EBoardInfo info = ((DefaultTournamentService) tournamentService).getEBoardInfo(pairing);
-    if (info == null || !VIRTUAL_SERIAL.equals(info.getSerialNr())) {
+    if (info == null || !isVirtualBoard(info.getSerialNr())) {
       return;
     }
 
@@ -114,5 +114,9 @@ public class StartRecording extends APIOperation {
     gameField.set(recorder, resetGame);
 
     info.setLiveGame(resetGame);
+  }
+
+  private boolean isVirtualBoard(String serialNr) {
+    return serialNr != null && serialNr.startsWith(VIRTUAL_SERIAL_PREFIX);
   }
 }

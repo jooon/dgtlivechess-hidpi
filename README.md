@@ -1,6 +1,8 @@
 # dgtlivechess-hidpi
 
-This repo patches DGT LiveChess so it can run scaled on HiDPI displays.
+This repo patches DGT LiveChess so it can run scaled on HiDPI displays and so it can be tested without a physical DGT board.
+
+The patch adds eight built-in software-only e-boards, `Virtual board 1` through `Virtual board 8`. You can assign them to pairings and use them to test recording and board editing in LiveChess without connecting real hardware.
 
 ## Files
 
@@ -25,7 +27,7 @@ This repo patches DGT LiveChess so it can run scaled on HiDPI displays.
 - [compat-src/com/novotea/livechess/operations/tournament/StartRecording.java](compat-src/com/novotea/livechess/operations/tournament/StartRecording.java)
   Keeps the normal recording operation in place once the synthetic e-board service patch makes a virtual board assignable.
 - [compat-src/com/novotea/livechess/service/eboard/DefaultEBoardService.java](compat-src/com/novotea/livechess/service/eboard/DefaultEBoardService.java)
-  Adds a persistent software-only e-board so you can assign a board and record through the standard DGT LiveChess flow without hardware.
+  Adds persistent software-only e-boards so you can assign boards and record through the standard DGT LiveChess flow without hardware.
 
 ## Prerequisites
 
@@ -82,7 +84,7 @@ This repo also now patches one functional limitation in the app itself:
 - add a software-only e-board for offline recording work
   Cause: the original app only exposes recordable pairings through attached e-board resources
 
-With that patch, DGT LiveChess always exposes a synthetic `Virtual board` in the normal e-board list. Add it to a tournament, assign it to a pairing, and start recording normally. The recording then runs through the standard `EBoardRecorder` and `DefaultLiveGame` path instead of a custom fallback object.
+With that patch, DGT LiveChess always exposes eight synthetic boards in the normal e-board list: `Virtual board 1` through `Virtual board 8`. Add any of them to a tournament, assign them to pairings, and start recording normally. Recording still runs through the standard `EBoardRecorder` and `DefaultLiveGame` path instead of a custom fallback object.
 
 ## Known Risk
 

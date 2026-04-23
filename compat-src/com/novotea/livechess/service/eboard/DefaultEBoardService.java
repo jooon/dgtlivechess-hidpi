@@ -24,16 +24,20 @@ import com.novotea.livechess.service.ResourceMap;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 @RegisterService(EBoardService.class)
 public class DefaultEBoardService implements EBoardService, LiveChessService {
-  private static final String VIRTUAL_SERIAL = "Virtual board";
+  private static final String VIRTUAL_SERIAL_PREFIX = "Virtual board ";
+  private static final int VIRTUAL_BOARD_COUNT = 8;
   private static final String VIRTUAL_TYPE = "Virtual";
-  private static final String VIRTUAL_VERSION = "hidpi-patch-begin";
+  private static final String VIRTUAL_VERSION = "hidpi-patch-multi-board";
   private static final String VIRTUAL_COMMENT = "Software-only e-board";
   private static final byte BEGIN_OPCODE = (byte) 111;
+  private static final List<String> VIRTUAL_SERIALS = buildVirtualSerials();
 
   private final PersistencyService service;
   private final ResourceMap<String, EBoardInfo, DefaultEBoardResource> map;
@@ -189,17 +193,18 @@ public class DefaultEBoardService implements EBoardService, LiveChessService {
     Listeners.removeListener(listeners, listener);
   }
 
-  private EBoardInfo ensureVirtualBoardInfo() {
-    EBoardInfo info = map.get(VIRTUAL_SERIAL);
-    if (info == null) {
-      info = EBoardInfo.newInstance(VIRTUAL_SERIAL);
-      configureVirtualBoard(info);
-      map.add(info);
-      return info;
-    }
+  private void ensureVirtualBoardInfo() {
+    for (String serialNr : VIRTUAL_SERIALS) {
+      EBoardInfo info = map.get(serialNr);
+      if (info == null) {
+        info = EBoardInfo.newInstance(serialNr);
+        configureVirtualBoard(info);
+        map.add(info);
+        continue;
+      }
 
-    configureVirtualBoard(info);
-    return info;
+      configureVirtualBoard(info);
+    }
   }
 
   private void configureVirtualBoard(EBoardInfo info) {
@@ -212,7 +217,15 @@ public class DefaultEBoardService implements EBoardService, LiveChessService {
   }
 
   private boolean isVirtualBoard(String serialNr) {
-    return VIRTUAL_SERIAL.equals(serialNr);
+    return VIRTUAL_SERIALS.contains(serialNr);
+  }
+
+  private static List<String> buildVirtualSerials() {
+    List<String> serials = new ArrayList<>(VIRTUAL_BOARD_COUNT);
+    for (int index = 1; index <= VIRTUAL_BOARD_COUNT; index++) {
+      serials.add(VIRTUAL_SERIAL_PREFIX + index);
+    }
+    return Collections.unmodifiableList(serials);
   }
 
   private void ensureVirtualBoardPCR(File boardDirectory, boolean reset) throws IOException {

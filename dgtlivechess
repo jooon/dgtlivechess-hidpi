@@ -251,6 +251,9 @@ def cleanup_virtual_board_recordings(state_dir):
     if not recording_dir.exists():
         return
 
+    def is_virtual_board(serial_nr):
+        return serial_nr.startswith("Virtual board ")
+
     for path in recording_dir.glob("*.json"):
         try:
             data = json.loads(path.read_text())
@@ -262,13 +265,13 @@ def cleanup_virtual_board_recordings(state_dir):
             if not isinstance(item, dict):
                 continue
             for value in item.values():
-                if isinstance(value, dict) and value.get("serialNr") == "Virtual board":
+                if isinstance(value, dict) and is_virtual_board(value.get("serialNr", "")):
                     serial_nr = value.get("serialNr")
                     break
             if serial_nr:
                 break
 
-        if serial_nr == "Virtual board":
+        if is_virtual_board(serial_nr or ""):
             path.unlink()
 
 
