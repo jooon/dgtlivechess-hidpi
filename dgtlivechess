@@ -1,0 +1,235 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Runtime wrapper for the compatibility build produced by ./build.sh.
+# Build once with internet access, then this launcher runs offline.
+
+ROOT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+APP_DIR=${APP_DIR:-/opt/DGTLiveChess}
+BUILD_DIR=${BUILD_DIR:-"$ROOT_DIR/build"}
+STATE_DIR="${STATE_DIR:-$HOME/.dgt_livechess}"
+CACHE_DIR="${CACHE_DIR:-$BUILD_DIR/cache}"
+UI_SCALE=${UI_SCALE:-2}
+JAVAFX_VERSION=${JAVAFX_VERSION:-11.0.2}
+JAVAFX_PLATFORM=${JAVAFX_PLATFORM:-linux}
+JAVA_USER_HOME=${JAVA_USER_HOME:-$HOME}
+
+PACKAGE_JAR="$APP_DIR/app/package.jar"
+PATCHED_PACKAGE_JAR="$CACHE_DIR/package-patched.jar"
+BOOT_CONFIG="$STATE_DIR/boot/config.json"
+OPENJFX_DIR="$BUILD_DIR/openjfx-runtime"
+JAXB_DIR="$BUILD_DIR/jaxb-runtime"
+CLASSES_DIR="$BUILD_DIR/classes"
+OPENJFX_CACHE_DIR="$CACHE_DIR/openjfx-native"
+
+if [[ -z "${JAVA:-}" ]]; then
+  for candidate in \
+    /usr/lib/jvm/java-11-openjdk-amd64/bin/java \
+    /usr/lib/jvm/java-11-openjdk/bin/java \
+    /usr/lib/jvm/temurin-11-jdk-amd64/bin/java \
+    /usr/lib/jvm/temurin-11-jdk/bin/java
+  do
+    if [[ -x "$candidate" ]]; then
+      JAVA=$candidate
+      break
+    fi
+  done
+  JAVA=${JAVA:-java}
+fi
+
+required_files=(
+  "$PACKAGE_JAR"
+  "$OPENJFX_DIR/javafx-base-$JAVAFX_VERSION-$JAVAFX_PLATFORM.jar"
+  "$OPENJFX_DIR/javafx-controls-$JAVAFX_VERSION-$JAVAFX_PLATFORM.jar"
+  "$OPENJFX_DIR/javafx-fxml-$JAVAFX_VERSION-$JAVAFX_PLATFORM.jar"
+  "$OPENJFX_DIR/javafx-graphics-$JAVAFX_VERSION-$JAVAFX_PLATFORM.jar"
+  "$OPENJFX_DIR/javafx-media-$JAVAFX_VERSION-$JAVAFX_PLATFORM.jar"
+  "$OPENJFX_DIR/javafx-swing-$JAVAFX_VERSION-$JAVAFX_PLATFORM.jar"
+  "$OPENJFX_DIR/javafx-web-$JAVAFX_VERSION-$JAVAFX_PLATFORM.jar"
+  "$JAXB_DIR/jaxb-api-2.3.1.jar"
+  "$JAXB_DIR/jaxb-runtime-2.3.9.jar"
+  "$JAXB_DIR/txw2-2.3.9.jar"
+  "$JAXB_DIR/istack-commons-runtime-3.0.12.jar"
+  "$JAXB_DIR/javax.activation-api-1.2.0.jar"
+  "$CLASSES_DIR/com/novotea/entity/ProxyUtil.class"
+  "$CLASSES_DIR/com/novotea/entity/ProxyUtil\$InvokeCallback.class"
+  "$CLASSES_DIR/com/novotea/entity/ProxyEntityAccess.class"
+  "$CLASSES_DIR/com/novotea/ui/core/AbstractColumnUI.class"
+)
+
+missing=0
+for path in "${required_files[@]}"; do
+  if [[ ! -f "$path" ]]; then
+    printf 'missing build artifact: %s\n' "$path" >&2
+    missing=1
+  fi
+done
+
+if [[ $missing -ne 0 ]]; then
+  echo "run ./build.sh first" >&2
+  exit 1
+fi
+
+if ! command -v "$JAVA" >/dev/null 2>&1; then
+  echo "java not found: $JAVA" >&2
+  exit 1
+fi
+
+JAXB_CP=$(printf '%s:' "$JAXB_DIR"/*.jar)
+JAXB_CP=${JAXB_CP%:}
+
+mkdir -p "$OPENJFX_CACHE_DIR"
+
+python3 - "$PACKAGE_JAR" "$PATCHED_PACKAGE_JAR" "$BOOT_CONFIG" "$STATE_DIR" "$CLASSES_DIR" <<'PY'
+import io
+import json
+import pathlib
+import shutil
+import sys
+import tempfile
+import zipfile
+
+PACKAGE_JAR = pathlib.Path(sys.argv[1])
+PATCHED_PACKAGE_JAR = pathlib.Path(sys.argv[2])
+BOOT_CONFIG = pathlib.Path(sys.argv[3])
+STATE_DIR = pathlib.Path(sys.argv[4])
+CLASSES_DIR = pathlib.Path(sys.argv[5])
+
+PATCHES = {
+    "com/novotea/entity/ProxyUtil.class": (CLASSES_DIR / "com/novotea/entity/ProxyUtil.class").read_bytes(),
+    "com/novotea/entity/ProxyUtil$InvokeCallback.class": (
+        CLASSES_DIR / "com/novotea/entity/ProxyUtil$InvokeCallback.class"
+    ).read_bytes(),
+    "com/novotea/entity/ProxyEntityAccess.class": (
+        CLASSES_DIR / "com/novotea/entity/ProxyEntityAccess.class"
+    ).read_bytes(),
+    "com/novotea/ui/core/AbstractColumnUI.class": (
+        CLASSES_DIR / "com/novotea/ui/core/AbstractColumnUI.class"
+    ).read_bytes(),
+}
+
+
+def zip_is_patched_bytes(data):
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as zf:
+            for name, payload in PATCHES.items():
+                if zf.read(name) != payload:
+                    return False
+    except Exception:
+        return False
+    return True
+
+
+def patch_zip_bytes(data):
+    src = io.BytesIO(data)
+    dst = io.BytesIO()
+    with zipfile.ZipFile(src, "r") as zin, zipfile.ZipFile(dst, "w") as zout:
+        for info in zin.infolist():
+            if info.filename in PATCHES:
+                continue
+            zout.writestr(info, zin.read(info.filename))
+        for name, payload in PATCHES.items():
+            info = zipfile.ZipInfo(name)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            zout.writestr(info, payload)
+    return dst.getvalue()
+
+
+def write_atomic(path, data):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as tmp:
+        tmp.write(data)
+        tmp_path = pathlib.Path(tmp.name)
+    tmp_path.replace(path)
+
+
+def patch_zip_file(path, backup_suffix=None):
+    if not path.exists():
+        return
+    data = path.read_bytes()
+    if zip_is_patched_bytes(data):
+        return
+    if backup_suffix is not None:
+        backup_path = path.with_name(path.name + backup_suffix)
+        if not backup_path.exists():
+            shutil.copy2(path, backup_path)
+    write_atomic(path, patch_zip_bytes(data))
+
+
+def build_patched_package(package_jar, patched_package_jar):
+    rebuild = True
+    if patched_package_jar.exists():
+        try:
+            with zipfile.ZipFile(patched_package_jar, "r") as zf:
+                cached_application = zf.read("application.jar")
+            if (
+                patched_package_jar.stat().st_mtime_ns >= package_jar.stat().st_mtime_ns
+                and zip_is_patched_bytes(cached_application)
+            ):
+                rebuild = False
+        except Exception:
+            rebuild = True
+
+    if not rebuild:
+        return
+
+    patched_package_jar.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(package_jar, "r") as zin:
+        with tempfile.NamedTemporaryFile(dir=patched_package_jar.parent, delete=False) as tmp:
+            tmp_path = pathlib.Path(tmp.name)
+        try:
+            with zipfile.ZipFile(tmp_path, "w") as zout:
+                for info in zin.infolist():
+                    data = zin.read(info.filename)
+                    if info.filename == "application.jar":
+                        data = patch_zip_bytes(data)
+                    zout.writestr(info, data)
+            tmp_path.replace(patched_package_jar)
+        finally:
+            if tmp_path.exists():
+                tmp_path.unlink()
+
+
+def patch_boot_jars(state_dir, boot_config):
+    boot_dir = state_dir / "boot"
+    if not boot_dir.exists():
+        return
+
+    targets = set()
+
+    if boot_config.exists():
+        try:
+            config = json.loads(boot_config.read_text())
+            label = config.get("labels", {}).get("application", {}).get("active")
+            if label:
+                targets.add(boot_dir / f"{label}.jar")
+        except Exception:
+            pass
+
+    for jar_path in boot_dir.glob("*.jar"):
+        if jar_path.name == "boot.jar":
+            continue
+        if jar_path.name.endswith(".bak") or jar_path.name.endswith(".orig"):
+            continue
+        targets.add(jar_path)
+
+    for jar_path in sorted(targets):
+        patch_zip_file(jar_path, ".orig")
+
+
+build_patched_package(PACKAGE_JAR, PATCHED_PACKAGE_JAR)
+patch_boot_jars(STATE_DIR, BOOT_CONFIG)
+PY
+
+cd "$APP_DIR"
+
+exec "$JAVA" \
+  --module-path "$OPENJFX_DIR" \
+  --add-modules javafx.controls,javafx.fxml,javafx.swing,javafx.base,javafx.graphics,javafx.media,javafx.web \
+  -cp "$PATCHED_PACKAGE_JAR:$JAXB_CP" \
+  -Dcom.novotea.livechess.loader.directory=user \
+  -Dglass.gtk.uiScale="$UI_SCALE" \
+  -Djavafx.cachedir="$OPENJFX_CACHE_DIR" \
+  -Dsun.java2d.uiScale="$UI_SCALE" \
+  -Duser.home="$JAVA_USER_HOME" \
+  com.novotea.livechess.loader.LiveChessLoader "$@"
