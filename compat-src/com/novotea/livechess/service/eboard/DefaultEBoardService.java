@@ -58,6 +58,7 @@ public class DefaultEBoardService implements EBoardService, LiveChessService {
     detectionListeners = new CopyOnWriteArrayList<>();
 
     ensureVirtualBoardInfo();
+    ensureVirtualBoardPCRs();
 
     ServiceAccess.register(this);
     ((ShutdownService) ServiceAccess.get(ShutdownService.class)).register(map::dispose);
@@ -204,6 +205,39 @@ public class DefaultEBoardService implements EBoardService, LiveChessService {
       }
 
       configureVirtualBoard(info);
+    }
+  }
+
+  private void ensureVirtualBoardPCRs() throws IOException {
+    for (String serialNr : VIRTUAL_SERIALS) {
+      EBoardInfo info = map.get(serialNr);
+      if (info != null) {
+        ensureVirtualBoardPCR(info);
+      }
+    }
+  }
+
+  private void ensureVirtualBoardPCR(EBoardInfo info) throws IOException {
+    File boardDirectory = new File(directory, info.getSerialNr());
+    ensureVirtualBoardPCR(boardDirectory, false);
+    loadVirtualBoardPosition(info, boardDirectory);
+  }
+
+  private void loadVirtualBoardPosition(EBoardInfo info, File boardDirectory) throws IOException {
+    FilePCR pcr = null;
+    try {
+      pcr = new FilePCR(new File(boardDirectory, "eboard.pcr"), true);
+      FrameProcessing processing = new FrameProcessing(pcr, record -> {});
+      processing.init();
+      info.setBoard(processing.getBoard());
+      info.setFlipped(Boolean.valueOf(processing.isFlipped()));
+      info.setState(EBoardState.ACTIVE);
+    } catch (PCRException e) {
+      throw new IOException("Unable to load virtual board PCR", e);
+    } finally {
+      if (pcr != null) {
+        pcr.close();
+      }
     }
   }
 
