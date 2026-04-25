@@ -4,6 +4,8 @@ This repo patches DGT LiveChess so it can run scaled on HiDPI displays and so it
 
 The patch adds eight built-in software-only e-boards, `virt01` through `virt08`. You can assign them to pairings and use them to test recording and board editing in LiveChess without connecting real hardware.
 
+![DGT LiveChess HiDPI virtual board screenshot](dgtlivechess-hidpi-virtual-board.png)
+
 ## Files
 
 - [build.sh](build.sh)
