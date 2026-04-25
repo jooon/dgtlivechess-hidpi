@@ -1,6 +1,6 @@
 # dgtlivechess-hidpi
 
-This repo patches DGT LiveChess so it can run scaled on HiDPI displays and so it can be tested without a physical DGT board.
+This repo patches DGT LiveChess 2.2 so it can run scaled on HiDPI displays and so it can be tested without a physical DGT board.
 
 The patch adds eight built-in software-only e-boards, `virt01` through `virt08`. You can assign them to pairings and use them to test recording and board editing in LiveChess without connecting real hardware.
 
@@ -33,17 +33,23 @@ The patch adds eight built-in software-only e-boards, `virt01` through `virt08`.
 
 ## Prerequisites
 
-- Installed DGT LiveChess at `/opt/DGTLiveChess`
-- JDK 11+ on `PATH` (`java`, `javac`)
+- Installed [DGT LiveChess 2.2](https://www.livechesscloud.com/software/) at `/opt/DGTLiveChess`
+- JDK 11+ on `PATH` (`java`, `javac`). Only tested on Java 11. Later versions have graphical glitches.
 - `python3`
-- internet access when running `./build.sh`
-
-The generated `build/` directory is the only place that needs downloaded dependencies. Once `./build.sh` has completed, `./dgtlivechess` does not need internet.
 
 Runtime note:
 
 - `./dgtlivechess` prefers a local Java 11 runtime if one is installed
-- newer JDKs can still be forced with `JAVA=/path/to/java ./dgtlivechess`, but Java 11 is the safest tested path
+- newer JDKs can still be forced with `JAVA=/path/to/java ./dgtlivechess`
+
+## Install prerequisites
+
+Tested on Ubuntu 25.10
+
+```bash
+sudo dpkg -i DGT-LiveChess-2.2-x86_64.deb
+sudo apt install openjdk-11-jre python3
+```
 
 ## Build
 
