@@ -251,8 +251,10 @@ def cleanup_virtual_board_recordings(state_dir):
     if not recording_dir.exists():
         return
 
+    virtual_serials = {f"virt{index:02d}" for index in range(1, 9)}
+
     def is_virtual_board(serial_nr):
-        return serial_nr.startswith("Virtual board ")
+        return serial_nr in virtual_serials
 
     for path in recording_dir.glob("*.json"):
         try:

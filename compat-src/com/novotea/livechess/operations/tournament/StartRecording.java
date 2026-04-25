@@ -22,7 +22,8 @@ import java.util.List;
 
 @APIOperation.Description("Record new games")
 public class StartRecording extends APIOperation {
-  private static final String VIRTUAL_SERIAL_PREFIX = "Virtual board ";
+  private static final String VIRTUAL_SERIAL_PREFIX = "virt";
+  private static final int VIRTUAL_BOARD_COUNT = 8;
   private static final byte BEGIN_OPCODE = (byte) 111;
 
   private final List<Pairing> pairings;
@@ -117,6 +118,20 @@ public class StartRecording extends APIOperation {
   }
 
   private boolean isVirtualBoard(String serialNr) {
-    return serialNr != null && serialNr.startsWith(VIRTUAL_SERIAL_PREFIX);
+    if (serialNr == null || !serialNr.startsWith(VIRTUAL_SERIAL_PREFIX)) {
+      return false;
+    }
+
+    String suffix = serialNr.substring(VIRTUAL_SERIAL_PREFIX.length());
+    if (suffix.length() != 2) {
+      return false;
+    }
+
+    try {
+      int index = Integer.parseInt(suffix);
+      return index >= 1 && index <= VIRTUAL_BOARD_COUNT;
+    } catch (NumberFormatException e) {
+      return false;
+    }
   }
 }

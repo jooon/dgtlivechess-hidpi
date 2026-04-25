@@ -31,10 +31,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 @RegisterService(EBoardService.class)
 public class DefaultEBoardService implements EBoardService, LiveChessService {
-  private static final String VIRTUAL_SERIAL_PREFIX = "Virtual board ";
+  private static final String VIRTUAL_SERIAL_PREFIX = "virt";
   private static final int VIRTUAL_BOARD_COUNT = 8;
   private static final String VIRTUAL_TYPE = "Virtual";
-  private static final String VIRTUAL_VERSION = "hidpi-patch-multi-board";
+  private static final String VIRTUAL_VERSION = "1.0";
   private static final String VIRTUAL_COMMENT = "Software-only e-board";
   private static final byte BEGIN_OPCODE = (byte) 111;
   private static final List<String> VIRTUAL_SERIALS = buildVirtualSerials();
@@ -223,7 +223,8 @@ public class DefaultEBoardService implements EBoardService, LiveChessService {
   private static List<String> buildVirtualSerials() {
     List<String> serials = new ArrayList<>(VIRTUAL_BOARD_COUNT);
     for (int index = 1; index <= VIRTUAL_BOARD_COUNT; index++) {
-      serials.add(VIRTUAL_SERIAL_PREFIX + index);
+      String suffix = index < 10 ? "0" + index : Integer.toString(index);
+      serials.add(VIRTUAL_SERIAL_PREFIX + suffix);
     }
     return Collections.unmodifiableList(serials);
   }
