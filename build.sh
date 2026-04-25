@@ -142,6 +142,8 @@ mkdir -p "$TMP_DIR/classes"
   --add-modules javafx.controls,javafx.fxml,javafx.swing,javafx.base,javafx.graphics,javafx.media,javafx.web \
   --add-exports javafx.controls/com.sun.javafx.scene.control.behavior=ALL-UNNAMED \
   --add-exports javafx.controls/com.sun.javafx.scene.control.inputmap=ALL-UNNAMED \
+  --add-exports javafx.graphics/com.sun.javafx.scene=ALL-UNNAMED \
+  --add-exports javafx.graphics/com.sun.javafx.scene.traversal=ALL-UNNAMED \
   -cp "$APPLICATION_JAR" \
   -d "$TMP_DIR/classes" \
   "$ROOT_DIR/compat-src/com/sun/javafx/scene/control/skin/BehaviorSkinBase.java" \
@@ -151,6 +153,7 @@ mkdir -p "$TMP_DIR/classes"
   "$ROOT_DIR/compat-src/com/novotea/entity/ProxyUtil.java" \
   "$ROOT_DIR/compat-src/com/novotea/entity/ProxyEntityAccess.java" \
   "$ROOT_DIR/compat-src/com/novotea/ui/core/AbstractColumnUI.java" \
+  "$ROOT_DIR/compat-src/com/novotea/ui/javafx/cell/AutoComplete.java" \
   "$ROOT_DIR/compat-src/com/novotea/livechess/operations/tournament/StartRecording.java" \
   "$ROOT_DIR/compat-src/com/novotea/livechess/service/eboard/DefaultEBoardService.java"
 

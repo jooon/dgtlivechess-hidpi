@@ -78,6 +78,8 @@ The current compatibility layer patches these Java 8 to Java 11+/OpenJFX incompa
   Cause: JavaFX 8 internal API removed in JavaFX 11+
 - `NoClassDefFoundError` for `com.sun.javafx.scene.control.skin.BehaviorSkinBase`
   Cause: custom controls were compiled against JavaFX 8 internal skin base classes removed in JavaFX 11+
+- `IllegalAccessError` / `NoSuchMethodError` in `com.novotea.ui.javafx.cell.AutoComplete`
+  Cause: autocomplete controls use JavaFX 8 internal focus traversal APIs changed in JavaFX 11+
 
 This repo also now patches one functional limitation in the app itself:
 
